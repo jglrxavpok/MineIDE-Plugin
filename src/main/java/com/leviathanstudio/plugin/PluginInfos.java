@@ -2,6 +2,9 @@ package com.leviathanstudio.plugin;
 
 import java.util.Arrays;
 
+/**
+ * Object storing all the informations about a plugin
+ */
 public class PluginInfos
 {
     private final MineIDEPlugin plugin;
@@ -12,7 +15,11 @@ public class PluginInfos
     private String[] credits;
     private String description;
 
-    public PluginInfos(MineIDEPlugin plugin)
+    /**
+     * The constructor, should not be called outside of {@link PluginSystem}
+     * @param plugin
+     */
+    PluginInfos(MineIDEPlugin plugin)
     {
         state = PluginState.UNLOADED;
         this.plugin = plugin;
@@ -23,11 +30,21 @@ public class PluginInfos
         id = name.toLowerCase();
     }
 
+    /**
+     * Returns the instance of the represented mod
+     * @return
+     *      The instance of the mod
+     */
     public MineIDEPlugin getInstance()
     {
         return plugin;
     }
 
+    /**
+     * Returns the ID of the mod
+     * @return
+     *      The ID of the mod
+     */
     public String getID()
     {
         return id;
@@ -88,8 +105,14 @@ public class PluginInfos
         this.state = pluginState;
     }
 
+    /**
+     * Order: UNLOADED->UNINITIALIZED->INITIALIZED->LOADED
+     */
     public enum PluginState
     {
-        UNLOADED, UNINITIALIZED, PluginState, INITIALIZED, LOADED
+        UNLOADED,
+        UNINITIALIZED,
+        INITIALIZED,
+        LOADED
     }
 }

@@ -21,6 +21,10 @@ import java.util.List;
 import java.util.Optional;
 import java.util.function.Consumer;
 
+/**
+ * The Plugin System is the entity that handles loading, initialization and coordination of plugins.<br/>
+ * Plugins can be loaded from a folder as ".jar" files or from the classpath
+ */
 public class PluginSystem
 {
 
@@ -33,6 +37,10 @@ public class PluginSystem
     private static PluginSystem instance;
     private List<MineIDEPlugin> loadedPlugins;
 
+    /**
+     * Creates a new plugin system
+     * @param pluginFolder
+     */
     private PluginSystem(File pluginFolder)
     {
         loadedPlugins = new ArrayList<>();
@@ -40,11 +48,27 @@ public class PluginSystem
         temporaryLogger = LogManager.getLogger(this);
     }
 
+    /**
+     * Returns the folder used to search for plugins
+     * @return
+     *      The folder to search plugins in
+     */
     public File getPluginFolder()
     {
         return pluginFolder;
     }
 
+    /**
+     * Starts the Plugin System, loads the plugins and returns the created instance.<br/>
+     * <b>Warning:</b> It is only possible to have one instance of a Plugin System at a time
+     * @param pluginFolder
+     *      The folder to search plugins in, can be null for none
+     * @return
+     *      The created instance
+     *
+     * @throws IllegalStateException
+     *      If an instance already exists
+     */
     public static PluginSystem kickoff(File pluginFolder)
     {
         if(instance == null)
@@ -61,14 +85,28 @@ public class PluginSystem
         }
     }
 
-    public boolean isPluginPresent(String name)
+    /**
+     * Checks if a given plugin has been found by the system
+     * @param id
+     *      The ID of the plugin
+     * @return
+     *      <code>true</code> if the plugin is present, <code>false</code> otherwise
+     */
+    public boolean isPluginPresent(String id)
     {
-        return getPlugin(name).isPresent();
+        return getPlugin(id).isPresent();
     }
 
-    public boolean isPluginLoaded(String name)
+    /**
+     * Checks if a given plugin has been found by the system and loaded
+     * @param id
+     *      The ID of the plugin
+     * @return
+     *      <code>true</code> if the plugin is loaded, <code>false</code> otherwise
+     */
+    public boolean isPluginLoaded(String id)
     {
-        Optional<MineIDEPlugin> plugin = getPlugin(name);
+        Optional<MineIDEPlugin> plugin = getPlugin(id);
         if(plugin.isPresent())
         {
             return plugin.get().infos.getState() == PluginInfos.PluginState.LOADED;
@@ -76,10 +114,17 @@ public class PluginSystem
         return false;
     }
 
-    public Optional<MineIDEPlugin> getPlugin(String name)
+    /**
+     * Returns a potential plugin with the given id
+     * @param id
+     *      The id of the plugin
+     * @return
+     *      The potential plugin
+     */
+    public Optional<MineIDEPlugin> getPlugin(String id)
     {
         return loadedPlugins.stream()
-                .filter(p -> p.infos.getID().equals(name))
+                .filter(p -> p.getID().equals(id))
                 .findFirst();
     }
 
@@ -190,6 +235,9 @@ public class PluginSystem
         }
     }
 
+    /**
+     * Launches the initialization process of plugins
+     */
     public void initPlugins()
     {
         forAllPlugins(p -> p.infos.setState(PluginInfos.PluginState.UNINITIALIZED));
