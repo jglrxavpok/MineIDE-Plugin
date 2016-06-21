@@ -1,0 +1,6 @@
+{
+  "authors": ["jglrxavpok"],
+  "credits": ["jglrxavpok", "The Leviathan-Studio Team"],
+  "name": "Test plugin",
+  "description": "Just a simple test plugin to implement new features into the plugin system"
+}
