@@ -2,6 +2,7 @@ package com.leviathanstudio.plugin;
 
 import plugin.fr.scarex.obfuscatednamefinder.ui.ObfuscatedNameFinderFrame;
 
+import java.io.File;
 import java.util.Arrays;
 
 public class RunnableTestPlugin extends MineIDEPlugin
@@ -46,7 +47,7 @@ public class RunnableTestPlugin extends MineIDEPlugin
     // Debug
     public static void main(String[] args)
     {
-        PluginSystem pluginSystem = PluginSystem.kickoff(null);
+        PluginSystem pluginSystem = PluginSystem.kickoff(new File("./runtime"));
         pluginSystem.initPlugins();
     }
     

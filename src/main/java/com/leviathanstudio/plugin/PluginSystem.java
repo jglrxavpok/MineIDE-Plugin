@@ -1,12 +1,17 @@
 package com.leviathanstudio.plugin;
 
+import com.google.common.collect.ImmutableSet;
+import com.google.common.reflect.ClassPath;
 import com.google.gson.Gson;
 import com.google.gson.GsonBuilder;
 import com.google.gson.JsonArray;
 import com.google.gson.JsonObject;
+import groovy.lang.GroovyClassLoader;
+import groovy.lang.GroovyCodeSource;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 import org.reflections.Reflections;
+import org.reflections.util.ClasspathHelper;
 
 import java.io.File;
 import java.io.IOException;
@@ -33,6 +38,7 @@ public class PluginSystem
      * being initialized or after an exception preventing said plugin to properly load
      */
     private final Logger temporaryLogger;
+    private final GroovyClassLoader groovyLoader;
     private File pluginFolder;
     private static PluginSystem instance;
     private List<MineIDEPlugin> loadedPlugins;
@@ -46,6 +52,7 @@ public class PluginSystem
         loadedPlugins = new ArrayList<>();
         this.pluginFolder = pluginFolder;
         temporaryLogger = LogManager.getLogger(this);
+        groovyLoader = new GroovyClassLoader(getClass().getClassLoader());
     }
 
     /**
@@ -130,78 +137,113 @@ public class PluginSystem
 
     private void loadPluginFromClasspath()
     {
+        loadGroovyPlugins();
+
         Reflections reflections = new Reflections(Thread.currentThread().getContextClassLoader());
         for(Class<? extends MineIDEPlugin> pluginClass : reflections.getSubTypesOf(MineIDEPlugin.class))
         {
-            try
-            {
-                MineIDEPlugin plugin = pluginClass.newInstance();
-                PluginInfos infos = new PluginInfos(plugin);
-                infos.setID(plugin.getID());
-                plugin.logger = temporaryLogger;
+            loadPluginClass(pluginClass);
+        }
+    }
 
-                Package pluginPackage = pluginClass.getPackage();
-                if(pluginPackage != null)
+    private void loadPluginClass(Class<? extends MineIDEPlugin> pluginClass)
+    {
+        try
+        {
+            MineIDEPlugin plugin = pluginClass.newInstance();
+            PluginInfos infos = new PluginInfos(plugin);
+            infos.setID(plugin.getID());
+            plugin.logger = temporaryLogger;
+
+            Package pluginPackage = pluginClass.getPackage();
+            if(pluginPackage != null)
+            {
+                String path = "/"+pluginPackage.getName().replace(".", "/")+"/plugin_infos.json";
+                InputStream stream = PluginSystem.class.getResourceAsStream(path);
+                if(stream != null)
                 {
-                    String path = "/"+pluginPackage.getName().replace(".", "/")+"/plugin_infos.json";
-                    InputStream stream = PluginSystem.class.getResourceAsStream(path);
-                    if(stream != null)
+                    try
+                    {
+                        Gson gson = new GsonBuilder().setLenient().create();
+                        JsonObject pluginInfos = gson.fromJson(new InputStreamReader(stream), JsonObject.class);
+
+                        JsonArray authors = pluginInfos.getAsJsonArray("authors");
+                        String[] authorList = new String[authors.size()];
+                        for (int i = 0; i < authorList.length; i++)
+                        {
+                            authorList[i] = authors.get(i).getAsString();
+                        }
+                        infos.setAuthors(authorList);
+
+                        JsonArray credits = pluginInfos.getAsJsonArray("credits");
+                        String[] creditsList = new String[authors.size()];
+                        for (int i = 0; i < creditsList.length; i++)
+                        {
+                            creditsList[i] = credits.get(i).getAsString();
+                        }
+                        infos.setCredits(creditsList);
+
+                        infos.setName(pluginInfos.get("name").getAsString());
+                        infos.setDescription(pluginInfos.get("description").getAsString());
+                    }
+                    catch (Exception e)
+                    {
+                        plugin.onPluginException(e);
+                    }
+                    finally
                     {
                         try
                         {
-                            Gson gson = new GsonBuilder().setLenient().create();
-                            JsonObject pluginInfos = gson.fromJson(new InputStreamReader(stream), JsonObject.class);
-
-                            JsonArray authors = pluginInfos.getAsJsonArray("authors");
-                            String[] authorList = new String[authors.size()];
-                            for (int i = 0; i < authorList.length; i++)
-                            {
-                                authorList[i] = authors.get(i).getAsString();
-                            }
-                            infos.setAuthors(authorList);
-
-                            JsonArray credits = pluginInfos.getAsJsonArray("credits");
-                            String[] creditsList = new String[authors.size()];
-                            for (int i = 0; i < creditsList.length; i++)
-                            {
-                                creditsList[i] = credits.get(i).getAsString();
-                            }
-                            infos.setCredits(creditsList);
-
-                            infos.setName(pluginInfos.get("name").getAsString());
-                            infos.setDescription(pluginInfos.get("description").getAsString());
+                            stream.close();
                         }
-                        catch (Exception e)
+                        catch (IOException e)
                         {
-                            plugin.onPluginException(e);
                         }
-                        finally
-                        {
-                            try
-                            {
-                                stream.close();
-                            }
-                            catch (IOException e)
-                            {
-                            }
-                        }
-                    }
-                    else
-                    {
-                        temporaryLogger.info("Could not find plugin_infos.json for "+plugin.getClass().getCanonicalName()+
-                                " with path: "+path+". Automatic info loading could not be performed for this plugin");
                     }
                 }
+                else
+                {
+                    temporaryLogger.info("Could not find plugin_infos.json for "+plugin.getClass().getCanonicalName()+
+                            " with path: "+path+". Automatic info loading could not be performed for this plugin");
+                }
+            }
 
-                plugin.populateInfos(infos);
-                plugin.logger = LogManager.getLogger(infos.getName());
-                plugin.infos = infos;
-                loadedPlugins.add(plugin);
-            }
-            catch (InstantiationException | IllegalAccessException e)
+            plugin.populateInfos(infos);
+            plugin.logger = LogManager.getLogger(infos.getName());
+            plugin.infos = infos;
+            loadedPlugins.add(plugin);
+        }
+        catch (InstantiationException | IllegalAccessException e)
+        {
+            e.printStackTrace();
+        }
+    }
+
+    private void loadGroovyPlugins()
+    {
+        try
+        {
+            ImmutableSet<ClassPath.ResourceInfo> resources = ClassPath.from(getClass().getClassLoader()).getResources();
+            for(ClassPath.ResourceInfo info : resources)
             {
-                e.printStackTrace();
+                if(info.getResourceName().endsWith(".groovy"))
+                {
+                    loadGroovyPlugin(info.url());
+                }
             }
+        } catch (IOException e)
+        {
+            e.printStackTrace();
+        }
+    }
+
+    private void loadGroovyPlugin(URL url)
+    {
+        GroovyCodeSource source = new GroovyCodeSource(url);
+        Class<?> clazz = groovyLoader.parseClass(source);
+        if(clazz.getSuperclass().equals(MineIDEPlugin.class))
+        {
+            loadPluginClass((Class<? extends MineIDEPlugin>) clazz);
         }
     }
 
@@ -209,18 +251,26 @@ public class PluginSystem
     {
         if(pluginFolder == null)
             return;
-        File[] subfiles = pluginFolder.listFiles(f -> f.getName().endsWith(".jar") || f.getName().endsWith(".zip"));
+        File[] subfiles = pluginFolder.listFiles(f -> f.getName().endsWith(".jar") || f.getName().endsWith(".zip") || f.getName().endsWith(".groovy"));
         if(subfiles != null && subfiles.length > 0)
         {
-            URLClassLoader loader = (URLClassLoader)Thread.currentThread().getContextClassLoader();
+            URLClassLoader loader = URLClassLoader.newInstance(new URL[0], getClass().getClassLoader());
             try
             {
-                Method method = loader.getClass().getDeclaredMethod("addURL", URL.class);
+                Method method = URLClassLoader.class.getDeclaredMethod("addURL", URL.class);
+                method.setAccessible(true);
                 for(File f : subfiles)
                 {
                     try
                     {
-                        method.invoke(loader, f.toURI().toURL());
+                        if(f.getName().endsWith(".groovy"))
+                        {
+                            loadGroovyPlugin(f.toURI().toURL());
+                        }
+                        else
+                        {
+                            method.invoke(loader, f.toURI().toURL());
+                        }
                     }
                     catch (IOException | InvocationTargetException | IllegalAccessException e)
                     {
