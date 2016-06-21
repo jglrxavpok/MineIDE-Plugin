@@ -50,7 +50,7 @@ public class ObfuscatedNameFinderFrame extends Application
         searchTextField.setTooltip(new Tooltip("Name of field/method to find"));
         ArrayList<String[]> data = new ArrayList<String[]>();
         if(this.forgeVersions.get(this.forgeVersionComboBox.getItems().size()).getName().startsWith("1.8"))
-            data = parseCSV(new File(this.getGradleLocation(), "caches/minecraft/de/oceanlabs/mcp/mcp_snapshot/" + (new File(this.forgeVersions.get(this.forgeVersionComboBox.getItems().size()), "snapshot")).list()[0] + "/" + ((String)this.typeList) + ".csv"));
+            data = parseCSV(new File(this.getGradleLocation(), "caches/minecraft/de/oceanlabs/mcp/mcp_snapshot/" + (new File(this.forgeVersions.get(this.forgeVersionComboBox.getItems().size()), "snapshot")).list()[0] + "/" + ((String)this.typeList.getItems().get(0)) + ".csv"));
         else
             data = parseCSV(new File(this.forgeVersions.get(this.forgeVersionComboBox.getItems().size()), "unpacked/conf/" + ((String)this.typeList.getPromptText()) + ".csv"));
         this.csvData.clear();
